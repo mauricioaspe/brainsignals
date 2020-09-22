@@ -1,0 +1,167 @@
+# NOTA: Pasar otros ratones!!
+
+# Epocas a eliminar
+1597
+vHip
+- ch04ep02 FIXED! +
+*baseline
+mPDF
+- ch05ep11 +
+vHip 
+- ch00ep21 +
+- ch03,4epALL - (no removidas)
+
+1659
+BLA
+- ch08ep02 FIXED! + 
+mPFC
+- ch03ep06,12 FIXED! -
+NAC
+- ch01ep14 FIXED!! -
+*baseline
+mPFC
+- ch00ep09 +
+- ch01ep09 +
+- ch02ep09 +
+BLA
+- ch08ep12 +
+vHip
+- ch00epALL -
+- ch06ep21 -
+
+1665
+*baseline
+BLA
+- ch05ep22 +
+- ch06ep18,24 +
+- ch07ep5,8,16,17 +
+mPFC
+- ch05ep09,25 -
+NAC
+- ch01ep17 + 
+
+
+1668
+*baseline
+NAC
+- ch05epALL -
+vHIp
+- ch00ep01 -
+- ch01ep09 +
+- ch03-03 -> stranges 
+- ch05ep04 -
+- ch06ep12,15 +
+
+
+1678
+*baseline
+BLA
+- ch00ep1,12,20,22 +
+mPFC
+- ch01ep08 -
+- ch07ep08 +
+- ch08ep12 +
+NAC
+- ch04ep1,12,20 +
+- ch05ep01 +
+
+
+1908
+BLA
+- ch08ep11 FIXED!! +
+- ch06ep14 FIXED!! -
+- ch02,03,05ep13 FIXED!! +
+vHip
+- ch05ep13 FIXED!! +
+- ch00ep02,11 FIXED!! +
+
+
+1984 -- NO SE SI ACEPTE CAMBIOS!!
+all structures chxxep08
+-- mPFC FIXED!! +
+-- NAC FIXED!! +
+-- BLA Ver ep07!! -
+-- vHip Ver ep07!! -
+mPFC
+- chxxep02 No fue borrado!! No se ve malo!!
+vHip
+- ch06ep08 FIXED!! +
+
+
+1985
+mPFC
+- ch08ep10 FIXED!! +
+NAC
+- ch01ep04 FIXED!! +
+*baseline
+mPFC
+- ch07ep18 -
+
+
+2013
+BLA
+- ch00ep03 FIXED!! -
+*baseline
+BLA
+- ch04ep04 -
+- ch05ep03 -
+vHip
+- ch00ep01,09 -
+
+
+2014
+mPFC
+- ch00ep05 FIXED!! -
+NAC
+- ch00ep02 FIXED!! +
+*baselines
+BLA
+- ch04ep13,22 -
+- ch05ep13,22,25 -
+- ch06ep13,22 -
+- ch07ep09,13,22 -
+- ch08ep09 -
+mPFC
+- ch02ep24 -
+NAC
+- ch03ep13 -
+
+
+2018
+*baselines
+mPFC
+- ch03ep02,21
+- ch07ep02,09,21
+- ch09ep02,21
+
+vHip
+- ch02ep02
+- ch01epALL
+
+
+
+# Importante!!
+Todos los vHip son iguales!! ## Era un error del script (indice "0" para el loop de vHip)
+
+1678 ch14: ## Reemplazado por canal 13
+Traceback (most recent call last):
+  File "continuous_epochs.py", line 100, in <module>
+    channel = ps.loadContinuous(this_file)
+  File "/media/filer1/users/maspe/scripts/physig.py", line 82, in loadContinuous
+    n_records = get_number_of_records(filepath)
+  File "/media/filer1/users/maspe/scripts/physig.py", line 310, in get_number_of_records
+    raise IOError("file does not divide evenly into full records")
+OSError: file does not divide evenly into full records
+
+
+
+# Otros
+BLA rango 50, -50 (a veces +-20 o +- 80; -400, 200 en ch05 1908)
+mPFC mayor frecuencia? rango: -100, 100
+NAC rango -40, 40?
+vHip rango -200, 200? +-500?
+
+En script:
+Collecting all channels by structure...
+mPDF: Done! ## Solucionado
+
