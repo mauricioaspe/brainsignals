@@ -28,7 +28,7 @@ Ideas:
 
 ### Import the required modules
 import sys
-sys.path.insert(1, '/home/diogenes/Projects/SERT/modules/')
+sys.path.insert(1, '~/Projects/SERT/modules/')
 
 import glob
 import pickle
@@ -36,7 +36,9 @@ import time
 import os
 import numpy as np
 import pandas as pd
-import physig as ps
+
+#import models
+#import physig as ps
 
 
 # #### Get the mouse name and create the file name and folder paths
@@ -60,14 +62,16 @@ def getInfo(mice_list, save=False):
 
         # Setting working file and paths
         files_dir = '/home/diogenes/Projects/SERT/DATA/MICE/' + mouse + '/continuous/'
-        npys_dir  = '/home/diogenes/Projects/SERT/DATA/MICE/' + mouse + '/npys/'
-        figs_dir  = '/home/diogenes/Projects/SERT/DATA/MICE/' + mouse + '/figs/'
+        #npys_dir  = '/home/diogenes/Projects/SERT/DATA/MICE/' + mouse + '/npys/'
+        #figs_dir  = '/home/diogenes/Projects/SERT/DATA/MICE/' + mouse + '/figs/'
 
         # Start and end of OF from xy.csv
         print("Collecting start and end of OF...")
         time.sleep(1)
         
+        ### CAMBIAR POR OUTPUT DE MODELS.PY !!
         df = pd.read_csv(files_dir + 'xy.csv', header=None)
+        
         start_OF = int(np.ceil(df[3][0] * 30)) # Times 30 because of sampling at 30 KHz
         stop_OF = int(np.floor(df[3][1] * 30))
 
@@ -124,7 +128,7 @@ def getInfo(mice_list, save=False):
             'startOF': start_OF,
             'stopOF': stop_OF,
             'entrances_times': entrances_times,
-            'n_epochs': n_epochs,
+            #'n_epochs': n_epochs,
 
             'channels_list': channels_list,
             'channels_locs': channels_locations,
@@ -142,7 +146,7 @@ def getInfo(mice_list, save=False):
             print("Saving info file...")
             time.sleep(1)
 
-            pickle.dump(info, open('/home/diogenes/Projects/SERT/results/info_files/' + mouse + '.info', 'wb'), protocol=2)
+            pickle.dump(info, open('~/Projects/SERT/results/info_files/' + mouse + '.info', 'wb'), protocol=2)
             print('Info file: saved !!\n')
 
         print("Done !!\n")
