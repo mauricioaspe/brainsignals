@@ -28,7 +28,8 @@ Ideas:
 
 ### Import the required modules
 import sys
-sys.path.insert(1, '~/Projects/SERT/modules/')
+sys.path.insert(1, '~/Projects/brainsignals/modules/')
+sys.path.insert(1, '/home/diogenes/Projects/micetracker/')
 
 import glob
 import pickle
@@ -37,20 +38,17 @@ import os
 import numpy as np
 import pandas as pd
 
-#import models
+import models
 #import physig as ps
 
 
-# #### Get the mouse name and create the file name and folder paths
 
-#if len(sys.argv) > 1:
-#    ID = sys.argv[1]
-#else:
-#    print('Bad file name!')
-#    exit()
+def getMice(path='/home/diogenes/Projects/brainsignals/DATA/MICE/'):
+    mice_list = sorted(os.listdir(path))
+    print(mice_list)
+    
+    return mice_list
 
-def getMice(path='/home/diogenes/Projects/SERT/DATA/MICE/'):
-    return sorted(os.listdir(path))
 
 
 def getInfo(mice_list, save=False):
@@ -61,7 +59,7 @@ def getInfo(mice_list, save=False):
         time.sleep(1)
 
         # Setting working file and paths
-        files_dir = '/home/diogenes/Projects/SERT/DATA/MICE/' + mouse + '/continuous/'
+        files_dir = '/home/diogenes/Projects/brainsignals/DATA/MICE/' + mouse + '/continuous/'
         #npys_dir  = '/home/diogenes/Projects/SERT/DATA/MICE/' + mouse + '/npys/'
         #figs_dir  = '/home/diogenes/Projects/SERT/DATA/MICE/' + mouse + '/figs/'
 
@@ -70,21 +68,34 @@ def getInfo(mice_list, save=False):
         time.sleep(1)
         
         ### CAMBIAR POR OUTPUT DE MODELS.PY !!
-        df = pd.read_csv(files_dir + 'xy.csv', header=None)
+        raw = models.getData(files_dir + 'xy.csv')
+        data = raw['raw']
+
+        start_OF = int(np.ceil(data[3][0])) # Times 30 because of sampling at 30 KHz
+        stop_OF = int(np.floor(data[3][1]))
+
+        xy_raw = models.getXY(data, normalise=False)
+        xy = models.getXY(data, normalise=True)
         
-        start_OF = int(np.ceil(df[3][0] * 30)) # Times 30 because of sampling at 30 KHz
-        stop_OF = int(np.floor(df[3][1] * 30))
+        sanity = models.sanity(xy, print_graph=False)
+            
+            
+        center_vector = models.centerEvents(xy)
+        path_analysis = models.pathAnalysis(xy, center_vector,
+                                        iei_treshold = 3,
+                                        dwell_treshold=1,
+                                        center=0.5)
 
         # Read the entrances times from entradas.csv
         print("Reading entrances times...")
         time.sleep(1)
         
-        df = pd.read_csv(files_dir + 'entradas.csv', header=None, names=["locs"])
-        entrances_times = np.array(df['locs'].tolist(), dtype='int') * 30 # Times 30 because of sampling at 30 KHz
-        n_epochs = len(entrances_times)
+#        df = pd.read_csv(files_dir + 'entradas.csv', header=None, names=["locs"])
+#        entrances_times = np.array(df['locs'].tolist(), dtype='int') * 30 # Times 30 because of sampling at 30 KHz
+#        n_epochs = len(entrances_times)
 
-        print("Entrances times: {}".format(entrances_times))
-        print('Number of entrances: {}'.format(n_epochs))
+        #print("Entrances times: {}".format(entrances_times))
+        #print('Number of entrances: {}'.format(n_epochs))
 
         # Creating channels list
         print('Loading channels list...')
@@ -127,7 +138,8 @@ def getInfo(mice_list, save=False):
 
             'startOF': start_OF,
             'stopOF': stop_OF,
-            'entrances_times': entrances_times,
+            'path': path_analysis,
+            'sanity': sanity,
             #'n_epochs': n_epochs,
 
             'channels_list': channels_list,
@@ -146,7 +158,7 @@ def getInfo(mice_list, save=False):
             print("Saving info file...")
             time.sleep(1)
 
-            pickle.dump(info, open('~/Projects/SERT/results/info_files/' + mouse + '.info', 'wb'), protocol=2)
+            pickle.dump(info, open('/home/diogenes/Projects/brainsignals/results/info_files/' + mouse + '.info', 'wb'), protocol=2)
             print('Info file: saved !!\n')
 
         print("Done !!\n")
