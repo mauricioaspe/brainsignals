@@ -32,32 +32,25 @@ Output:
 """ 
 
 
-# #### Import the required modules
-
-# In[3]:
-
-
-# Import required modules
+### Import required modules
 import sys
 sys.path.insert(1, '/home/diogenes/Projects/SERT/modules/')
 
-import glob
+import os
+#import glob
 import numpy as np
-import pandas as pd
+#import pandas as pd
 import physig as ps
 from scipy import signal
 from matplotlib import pyplot as plt
 
 
 
-# #### Create the filter
+#%%
+#######################
+### Create the filter
 
 # Butterpass at 300 Hz, oder 9
-
-# In[ ]:
-
-
-# Create filter
 def butter_bandpass(highcut, fs, order=5):
     nyq  = 0.5 * fs
     high = highcut / nyq
@@ -65,6 +58,7 @@ def butter_bandpass(highcut, fs, order=5):
     return b, a
 
 # Filter parameters
+fs = 30000.0
 highcut = 300.0
 N       = 9
 b, a    = butter_bandpass(highcut, fs, order=N)
@@ -80,11 +74,22 @@ b, a    = butter_bandpass(highcut, fs, order=N)
 #     <li>Save it as '/home/maspe/filer/SERT/SERTXXXX/npys/mPFC'</li>
 
 
+
+#%%
+pulses_path = '/home/diogenes/Projects/brainsignals/DATA/MICE/1597/continuous/AUX/'
+
+
+#%%
 ##### Main loop #####
 # Loop for loading and low-pass all channels of this mice
 iteration = 0
 for this_file in files:
+    pulses = ps.loadContinuous(pulses_file)
     channel = ps.loadContinuous(this_file)
+
+    print("Extracting pulses...")
+    d=np.diff(np.where(pulses['data'] < -4))[0]
+    on = np.where(d > 250)[0]
 
     print('Low-pass filtering (order = {}) at {} Hz...'.format(N, highcut))
     data = channel['data'] #[start_OF - points_before : stop_OF]
