@@ -100,7 +100,7 @@ for this_file in files:
     if iteration == 0:
         data_matrix = np.empty((len(channels_locations), len(data)))          
     
-    data_matrix[iteration, :] = data    
+    data_matrix[iteration, :] = data        
     iteration += 1
 
 print('\nCollecting all channels by structure...')    
