@@ -44,13 +44,16 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 
-IDs_all = pickle.load(open('IDs.dict', 'rb'))
-
+this_type = 'no-baselines'
 save_figs = True
 
 ### Main loop
-IDs = IDs_all['dict']
+IDs = ['SERT1597', 'SERT1659', 'SERT1678', 'SERT1908', 'SERT1984', 'SERT1985', 'SERT2014', 'SERT1665', 'SERT1668', 'SERT2013', 'SERT2018', 'SERT2024'] 
 
+structures = ['mPFC', 'NAC', 'BLA', 'vHip']
+
+IDs_WT = ['SERT1597', 'SERT1659', 'SERT1678', 'SERT1908', 'SERT1984', 'SERT1985', 'SERT2014'] 
+IDs_KO = ['SERT1665', 'SERT1668', 'SERT2013', 'SERT2018', 'SERT2024'] 
 
 
 grandAverage_WTs = dict()
@@ -60,47 +63,52 @@ iterator_WT = 0
 iterator_KO = 0
 
 
-print("List all: {}".format(IDs_all['list_WT']))
+#print("List all: {}".format(IDs_all['list_WT']))
 
 
 ### Group by genotype and structure
-for mouse in mouse_list:
+for mouse in IDs:
     print('Loading {}...'.format(mouse))
     
     ### Loading data
     npys_dir = '/home/maspe/filer/projects/brainsignals/DATA/MICE/' + mouse + '/npys/'
-    data = pickle.load(open(npys_dir + 'morlets.epochs', 'rb'))
+
+    data = pickle.load(open(npys_dir + 'morlets-{}.epochs'.format(this_type), 'rb'))
+
     print("Data keys: {}".format(data.keys()))
     print("mPFC shape: {}".format(data['mPFC'].shape))
     
-    if mouse in IDs_all['list_WT']:
-        print("Mouse: {}".format(mouse))
-        for structure in data.keys():
+    if mouse in IDs_WT:
+        print("Mouse (WT): {}".format(mouse))
+        for structure in structures: #data.keys():
             if iterator_WT == 0:
                 grandAverage_WTs[structure] = data[structure]
             else:
-                grandAverage_WTs[structure] = np.dstack((grandAverage_WTs[structure], data[structure]), axis=2)
+                grandAverage_WTs[structure] = np.dstack((grandAverage_WTs[structure], data[structure]))
      
         iterator_WT += 1
+        
+    else:
+        print("Mouse (KO): {}".format(mouse))
+        for structure in structures: #data.keys():
+            if iterator_KO == 0:
+                grandAverage_KOs[structure] = data[structure]
+            else:
+                grandAverage_KOs[structure] = np.dstack((grandAverage_KOs[structure], data[structure]))
 
+        iterator_KO += 1
+
+
+    
 print("Keys: {}".format(grandAverage_WTs.keys()))
 print("mPFC shape: {}".format(grandAverage_WTs['mPFC'].shape))
-
-# else:
-    #     for structure in data.keys():
-    #         if iterator_KO == 0:
-    #             grandAverage_KOs[structure] = np.mean(data[structure], axis=2)
-    #         else:
-    #             grandAverage_KOs[structure] = np.dstack((grandAverage_KOs[structure], np.mean(data[structure], axis=2)))
-            
-    #     iterator_KO += 1
      
         
 print('All mice processed in {:.2f} s.'.format(time.time() - clock))
 print('Done!')
 
 
-grandAverage = {'WTs': grandAverage_WTs} #, 'KOs': grandAverage_KOs}
+grandAverage = {'WTs': grandAverage_WTs, 'KOs': grandAverage_KOs}
 #for structure in structures.keys():
 #    grandAverage[structure] = np.mean(structures[structure], axis=2)
     
@@ -130,6 +138,13 @@ print('Plotting...')
 # Setting colormap range
 mycolormap = {'mPFC': (-1.5,1.5), 'NAC': (-1.5,1.5), 'BLA': (-1.5,1.5), 'vHip': (-1.5,1.5)}
 
+color_lim = False
+
+#cmap.set_over('red')
+#cmap.set_under('blue')
+
+#######################
+print('Plotting WTs...')
 for structure in grandAverage_WTs.keys():
     print(grandAverage_WTs[structure].shape)
     pwr1 = np.mean(grandAverage_WTs[structure], axis=2)
@@ -142,11 +157,12 @@ for structure in grandAverage_WTs.keys():
     ax1 = plt.subplot2grid((1, 5),(0, 0),colspan=4)
     
           
-    plt.imshow(pwr1,cmap='RdBu',vmax=np.max(pwr1),vmin=-np.max(pwr1),
+    plt.imshow(pwr1,cmap='jet',vmax=np.max(pwr1),vmin=-np.max(pwr1),
                extent=(min(time_windows),max(time_windows),fmin,fmax),
                origin='lower', interpolation='none',aspect='auto')
     plt.colorbar(fraction=0.05,pad=0.02)
-    #plt.clim(mycolormap[structure][0], mycolormap[structure][1])
+    if color_lim:
+        plt.clim(mycolormap[structure][0], mycolormap[structure][1])
     
     plt.axvline(x=3, color='black')
     plt.axhline(y=3, color='black', linestyle='--', linewidth=1)
@@ -165,103 +181,104 @@ for structure in grandAverage_WTs.keys():
     #ax1.set_yscale('log')
     ax1.set_xlabel('Time (s)', fontsize=16)
     ax1.set_ylabel('Frequency (Hz)', fontsize=16)
-    plt.title('SRS Grand-average for {} in WT'.format(structure), fontsize=20)
+    plt.title('SRS Grand-average for {} in WT ({})'.format(structure, this_type), fontsize=20)
 
     if save_figs:
         print('Saving figures for {}...'.format(structure))
-        plt.savefig('figs/spectrograms/{}_WT.png'.format(structure),
+        plt.savefig('figs/spectrograms/{}_WT_{}.png'.format(structure, this_type), dpi=150, orientation='landscape')
+
+
+#######################
+print('Plotting KOs...')
+for structure in grandAverage_KOs.keys():
+    pwr1 = np.mean(grandAverage_KOs[structure], axis=2)
+    fmin = min(frequencies)
+    fmax = max(frequencies)
+
+    plt.figure(1, figsize=(10, 4))
+    plt.clf()
+
+    ax1 = plt.subplot2grid((1, 5),(0, 0),colspan=4)
+    
+          
+    plt.imshow(pwr1,cmap='jet',vmax=np.max(pwr1),vmin=-np.max(pwr1),
+               extent=(min(time_windows),max(time_windows),fmin,fmax),
+               origin='lower', interpolation='none',aspect='auto')
+    plt.colorbar(fraction=0.05,pad=0.02)
+    if color_lim:
+        plt.clim(mycolormap[structure][0], mycolormap[structure][1])
+
+    plt.axvline(x=3, color='black')
+    plt.axhline(y=3, color='black', linestyle='--', linewidth=1)
+    plt.axhline(y=8, color='black', linestyle='--', linewidth=1)
+    plt.axhline(y=13, color='black', linestyle='--', linewidth=1)
+    plt.axhline(y=25, color='black', linestyle='--', linewidth=1)
+    plt.axhline(y=50, color='black', linestyle='--', linewidth=1)
+
+   
+    locs, labels = plt.xticks()    
+    plt.xticks(locs, ['-3', '-2', '-1', '0', '1', '2', '3'], fontsize=14)
+    plt.yticks([1.5, 6, 11, 19, 36, 65, 80], [r'$\delta$', r'$\theta$', r'$\alpha$',
+                                    r'$\beta$', r'$\gamma_{low}$', r'$\gamma_{high}$', '80'], fontsize=14)
+
+    #ax1.set_yscale('log')
+    ax1.set_xlabel('Time (s)', fontsize=16)
+    ax1.set_ylabel('Frequency (Hz)', fontsize=16)
+    plt.title('SRS Grand-average for {} in KO ({})'.format(structure, this_type), fontsize=20)
+
+    
+    if save_figs:
+        print('Saving figures for KO...')
+        plt.savefig('figs/spectrograms/{}_KO_{}.png'.format(structure, this_type),
                 dpi=150, orientation='landscape')
 
 
-# #######################
-# print('Plotting KOs...')
-# for structure in grandAverage_KOs.keys():
-#     pwr1 = np.mean(grandAverage_KOs[structure], axis=2)
-#     fmin = min(frequencies)
-#     fmax = max(frequencies)
+        
+#######################
+print('Plotting differences...')
+for structure in structures:
+    print("Structure: {}".format(structure))
 
-#     plt.figure(1, figsize=(10, 4))
-#     plt.clf()
+    pwr1 = np.mean(grandAverage['KOs'][structure], axis=2) - np.mean(grandAverage['WTs'][structure], axis=2)
 
-#     ax1 = plt.subplot2grid((1, 5),(0, 0),colspan=4)
+    fmin = min(frequencies)
+    fmax = max(frequencies)
+
+    plt.figure(1, figsize=(10, 4))
+    plt.clf()
+
+    ax1 = plt.subplot2grid((1, 5),(0, 0),colspan=4)
     
           
-#     plt.imshow(pwr1,cmap='RdBu',vmax=np.max(pwr1),vmin=-np.max(pwr1),
-#                extent=(min(time_windows),max(time_windows),fmin,fmax),
-#                origin='lower', interpolation='none',aspect='auto')
-#     plt.colorbar(fraction=0.05,pad=0.02)
-#     plt.clim(mycolormap[structure][0], mycolormap[structure][1])
+    plt.imshow(pwr1,cmap='jet',vmax=np.max(pwr1),vmin=-np.max(pwr1),
+               extent=(min(time_windows),max(time_windows),fmin,fmax),
+               origin='lower', interpolation='none',aspect='auto')
+    plt.colorbar(fraction=0.05,pad=0.02)
+    if color_lim:
+        plt.clim(mycolormap[structure][0], mycolormap[structure][1])
 
-#     plt.axvline(x=3, color='black')
-#     plt.axhline(y=3, color='black', linestyle='--', linewidth=1)
-#     plt.axhline(y=8, color='black', linestyle='--', linewidth=1)
-#     plt.axhline(y=13, color='black', linestyle='--', linewidth=1)
-#     plt.axhline(y=25, color='black', linestyle='--', linewidth=1)
-#     plt.axhline(y=50, color='black', linestyle='--', linewidth=1)
+    
+    plt.axvline(x=3, color='black')
+    plt.axhline(y=3, color='black', linestyle='--', linewidth=1)
+    plt.axhline(y=8, color='black', linestyle='--', linewidth=1)
+    plt.axhline(y=13, color='black', linestyle='--', linewidth=1)
+    plt.axhline(y=25, color='black', linestyle='--', linewidth=1)
+    plt.axhline(y=50, color='black', linestyle='--', linewidth=1)
 
    
-#     locs, labels = plt.xticks()    
-#     plt.xticks(locs, ['-3', '-2', '-1', '0', '1', '2', '3'], fontsize=14)
-#     plt.yticks([1.5, 6, 11, 19, 36, 65, 80], [r'$\delta$', r'$\theta$', r'$\alpha$',
-#                                     r'$\beta$', r'$\gamma_{low}$', r'$\gamma_{high}$', '80'], fontsize=14)
-
-#     #ax1.set_yscale('log')
-#     ax1.set_xlabel('Time (s)', fontsize=16)
-#     ax1.set_ylabel('Frequency (Hz)', fontsize=16)
-#     plt.title('SRS Grand-average for {} in KO'.format(structure), fontsize=20)
-
-    
-#     if save_figs:
-#         print('Saving figures for KO...')
-#         plt.savefig('figs/spectrograms/{}_KO_periphery_baseline3.png'.format(structure),
-#                 dpi=150, orientation='landscape')
+    locs, labels = plt.xticks()    
+    plt.xticks(locs, ['-3', '-2', '-1', '0', '1', '2', '3'], fontsize=14)
+    plt.yticks([1.5, 6, 11, 19, 36, 65, 80], [r'$\delta$', r'$\theta$', r'$\alpha$', r'$\beta$', r'$\gamma_{low}$', r'$\gamma_{high}$', '80'], fontsize=14)
 
 
+    #ax1.set_yscale('log')
+    ax1.set_xlabel('Time (s)', fontsize=16)
+    ax1.set_ylabel('Frequency (Hz)', fontsize=16)
+    plt.title('SRS Grand-average KO - WT for {} ({})'.format(structure, this_type), fontsize=20)
 
-# print('Plotting difference...')
-# for structure in ['mPFC', 'NAC', 'BLA', 'vHip']:
-#     print("Structure: {}".format(structure))
-
-#     pwr1 = np.mean(grandAverage['KOs'][structure], axis=2) - np.mean(grandAverage['WTs'][structure], axis=2)
-#     fmin = min(frequencies)
-#     fmax = max(frequencies)
-
-#     plt.figure(1, figsize=(10, 4))
-#     plt.clf()
-
-#     ax1 = plt.subplot2grid((1, 5),(0, 0),colspan=4)
-    
-          
-#     plt.imshow(pwr1,cmap='RdBu',vmax=np.max(pwr1),vmin=-np.max(pwr1),
-#                extent=(min(time_windows),max(time_windows),fmin,fmax),
-#                origin='lower', interpolation='none',aspect='auto')
-#     plt.colorbar(fraction=0.05,pad=0.02)
-#     plt.clim(mycolormap[structure][0], mycolormap[structure][1])
-
-    
-#     plt.axvline(x=3, color='black')
-#     plt.axhline(y=3, color='black', linestyle='--', linewidth=1)
-#     plt.axhline(y=8, color='black', linestyle='--', linewidth=1)
-#     plt.axhline(y=13, color='black', linestyle='--', linewidth=1)
-#     plt.axhline(y=25, color='black', linestyle='--', linewidth=1)
-#     plt.axhline(y=50, color='black', linestyle='--', linewidth=1)
-
-   
-#     locs, labels = plt.xticks()    
-#     plt.xticks(locs, ['-3', '-2', '-1', '0', '1', '2', '3'], fontsize=14)
-#     plt.yticks([1.5, 6, 11, 19, 36, 65, 80], [r'$\delta$', r'$\theta$', r'$\alpha$',
-#                                     r'$\beta$', r'$\gamma_{low}$', r'$\gamma_{high}$', '80'], fontsize=14)
-
-
-#     #ax1.set_yscale('log')
-#     ax1.set_xlabel('Time (s)', fontsize=16)
-#     ax1.set_ylabel('Frequency (Hz)', fontsize=16)
-#     plt.title('SRS Grand-average KO - WT for {}'.format(structure), fontsize=20)
-
-#     if save_figs:
-#         print('Saving figures for KO...')
-#         plt.savefig('/home/maspe/filer/SERT/ALL/figs/SRS/{}_KO-WT.png'.format(structure),
-#                 dpi=150, orientation='landscape')
+    if save_figs:
+        print('Saving differences...')
+        plt.savefig('figs/spectrograms/{}_KO-WT_{}.png'.format(structure, this_type), dpi=150, orientation='landscape')
 
 
 
