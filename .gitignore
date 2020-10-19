@@ -1,3 +1,6 @@
+/notes
+/__pycache__
 /*.py~
 /*.pyc
 /*.ipynb
+
