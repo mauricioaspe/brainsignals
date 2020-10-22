@@ -1,4 +1,5 @@
 # brainsignals
+Analysis of LFPs spectral and spiking activity, spiking/LFPs coupling, and other neurophysiological data.
 
 
 ## Usage
