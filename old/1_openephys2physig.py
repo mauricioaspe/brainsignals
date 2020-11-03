@@ -88,7 +88,7 @@ for this_file in files:
     channel = ps.loadContinuous(this_file)
 
     print("Extracting pulses...")
-    d=np.diff(np.where(pulses['data'] < -4))[0]
+    d = np.diff(np.where(pulses['data'] < -4))[0]
     on = np.where(d > 250)[0]
 
     print('Low-pass filtering (order = {}) at {} Hz...'.format(N, highcut))
