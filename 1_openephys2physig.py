@@ -57,6 +57,10 @@ b, a    = butter_bandpass(highcut, fs, order=N)
 
 #pulses_path = '/home/diogenes/Projects/brainsignals/DATA/MICE/1597/continuous/AUX/'
 
+idS = ['SERT1597', 'SERT1659', 'SERT1678', 'SERT1908',
+       'SERT1984', 'SERT1985', 'SERT2014', 'SERT1668',
+       'SERT1665', 'SERT2018', 'SERT2024', 'SERT2013']
+
 
 #%%
 ##### Main loop #####
