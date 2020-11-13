@@ -74,11 +74,14 @@ seconds_post = 2
 window_pre = int(fs) * seconds_pre
 window_post = int(fs) * seconds_post
 
+baseline_length = 3 * int(fs)
+
 n_baselines = 25
 substracted = 'median'
 
 plotting_epochs = False
 
+save_data = True
 
 iterator = 1
 for ID in IDs:
@@ -93,7 +96,7 @@ for ID in IDs:
     # Read the entrances times
     #df = pd.read_excel(files_dir + 'entradas.xlsx', sheet_name=0, header=None, names=["locs"])
     df = pd.read_csv('DATA/info/ID1597.behaviour')
-    entrances_times = df.loc[df['dwell'] >= 30, 'entrances'].to_numpy()
+    entrances_times = df.loc[df['dwell'] >= 30, 'entrances'].to_numpy() * 1000 # From 30 to 30,000 Hz
     print("Entrances times: {}".format(entrances_times))
 
     n_epochs = len(entrances_times)
@@ -102,10 +105,10 @@ for ID in IDs:
     # Defining baselines as 3 s windows
     baselines = baselines_all['SERT1597'] * 1000 # From 30 to 30,000 Hz
 
-    
-    structures = {'all': {}}
-    
+    print("Pre window: {}".format(window_pre))
+    print("Post window: {}".format(window_post))                
 
+    structures = {'all': {}}
     for structure in structures.keys():
         clock = time.time()
 
@@ -117,27 +120,38 @@ for ID in IDs:
 
         print("\nLoading continuous...")        
         data = np.load('DATA/continuous/{}_{}-{}.npy'.format(ID, structure, substracted))
-        print("Raw data shape: {}".format(data.shape))
-        print("Loaded in {:.2f} min".format((time.time() - clock) / 60))
         n_channels = data.shape[0]
+        data_points = data.shape[1]
+        
+        print("Number of channels: {}".format(n_channels))
+        print("Channels data points: {}".format(data_points))
+        print("Recording length: {} min".format(data_points / 30000 / 60))
+        print("Loaded in {:.2f} min".format((time.time() - clock) / 60))
+
     
         print('Collecting epochs...')
         #### MAKE THEM FROM NAN INSTEAD OF ZEROS; REPLACE WITH VALUES FROM VARIABLE DWELL TIMES
         data_epochs    = np.zeros((n_channels, window_pre + window_post, n_epochs))
         print("Empty data epoch shape: {}".format(data_epochs.shape))
+        
         data_baselines = np.zeros((n_channels, window_pre, n_baselines))
+        print("Empty baselines epoch shape: {}".format(data_baselines.shape))        
 
         for channel in range(n_channels):
+            #print("Channel: {}".format(channel))
+            sys.stdout.write("Channel: %#d%   \r" % (channel))
+
+            if channel < n_channels - 1:
+                sys.stdout.flush()
+            
             for epoch in range(n_epochs):
-                print("Channel: {}".format(channel))
-                print("Entrances times: {}".format(entrances_times))
-                print("Epoch: {}".format(epoch))
-                print("Pre window: {}".format(window_pre))
-                print("Post window: {}".format(window_post))                
+                #print("Entrances times: {}".format(entrances_times)) 
+                #print("Epoch: {}".format(epoch))
+
                 data_epochs[channel, :, epoch] = data[channel, entrances_times[epoch] - window_pre : entrances_times[epoch] + window_post]
             
             for baseline in range(n_baselines):
-                data_baselines[channel, :, baseline] = data[channel, baselines[baseline] : baselines[baseline] + window_post]
+                data_baselines[channel, :, baseline] = data[channel, baselines[baseline] : baselines[baseline] + baseline_length]
 
                 
         structures[structure]['epochs']    = data_epochs
@@ -175,9 +189,11 @@ for ID in IDs:
         
         iterator += 1
         
-    
-    #print('Saving epoched dictionary...')
-    #pickle.dump(structures, open(npys_dir + mouse + '.epochs2', 'wb'), protocol=2)              
+
+    if save_data:
+        print('Saving epoched dictionary...')
+        pickle.dump(structures, open('DATA/epochs/' + ID + '.epochs', 'wb'), protocol=2)              
+
     print('Epochs extracted in {:.2f} min.\n'.format((time.time() - clock) / 60))
 
 print('Done!')
