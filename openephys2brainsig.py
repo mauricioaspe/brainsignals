@@ -2,8 +2,12 @@
 # coding: utf-8
 
 '''
-[TODO] Document
+[TODO] To document
 
+OUTPUT:
+    - 'DATA/continuous/{}_channels.statistics'.format(ID)
+    - 'DATA/continuous/{}_{}-{}'.format(ID, structure, substract), channels_matrix)
+    - 'DATA/continuous/{}_triggers'
 
 '''
 
@@ -13,16 +17,17 @@ import sys
 import os
 import glob
 import numpy as np
-import physig as ps
+import loadEphys as loadRaw
+
 from scipy import signal
 from datetime import datetime
 #from matplotlib import pyplot as plt
 import pandas as pd
 import time
+import pickle
 
 sys.path.insert(1, "/home/maspe/filer/projects/brainsignals/modules/")
 os.chdir('/home/maspe/filer/projects/brainsignals/')
-
 
 
 # ## Filter
@@ -36,12 +41,11 @@ def butter_bandpass(highcut=highcut, fs=fs, order=5):
     return b, a
 
 
-
 # ## Get channels indexes
 def getChannIndexes(ID):
     print("Collecting channels for mouse {}...".format(ID))
     # Read the list of channels
-    df = pd.read_csv('DATA/MICE/' + ID + '/csv/canales.csv', header=None)
+    df = pd.read_csv('RAW/MICE/' + ID + '/csv/canales.csv', header=None)
     channels_locations = df[0].values.tolist()
 
     # Collect the indexes for each structure
@@ -57,10 +61,9 @@ def getChannIndexes(ID):
     return channels_indexes
 
 
-
 # ############################
 # ## Main loop
-def openephys_to_npy(IDs=['SERT1597'], structures=['mPFC'], filter_order=9, substract='median', downsampling=False, load_triggers=False, load_accelerometers=False, save_data=True):
+def raw_to_npy(IDs=['SERT1597'], structures=['mPFC'], only=[], filter_order=9, detrend=True, substract='median', downsampling=False, load_triggers=False, load_accelerometers=False, save_data=True):
     
     # The loop
     # - Load each of the 32 .continuous Openephys files
@@ -74,94 +77,143 @@ def openephys_to_npy(IDs=['SERT1597'], structures=['mPFC'], filter_order=9, subs
 
     if (substract == 'median_all') & (structures != 'all'):
         print("\n[WARNING] You can't substract=median_all when not selecting structures=all!")
-        print("-> Changing to substract=median_structure !!\n")
+        print("-> substract=median_all changed to substract=median_structure !!\n")
         substract = 'median_structure'
-        time.sleep(3)
+        input("Press ENTER to continue...")
 
         
     # ## Main loop    
     for ID in IDs:
         clock = time.time()
-        path_to_continuous = 'DATA/MICE/' + ID + '/continuous/*.continuous'
+        path_to_continuous = 'RAW/MICE/' + ID + '/continuous/*.continuous'
         electrodes = sorted(glob.glob(path_to_continuous))
 
+
+        if not detrend:
+            print("[Warning] Detrending set to false!")
+
         # Get channels and structures indexes
-        channels_indexes = getChannIndexes(ID)
+        #channels_indexes = 
+        this_structures = list()
+        this_structures.append(structures)
+        print(this_structures)
 
-        for structure in structures:
+                
+        for structure in this_structures:
             if structures == 'all':
-                structure_indexes = channels_indexes['all']
+                channels_indexes = getChannIndexes(ID)['all']
             else:
-                structure_indexes = channels_indexes[structure]
+                channels_indexes = getChannIndexes(ID)[structure]
 
-            print("Structure indexes: {}".format(structure_indexes))
+            if len(only):
+                channels_indexes = np.array(channels_indexes)[only] - 1
+                
+            #print("Structure indexes: {}".format(channels_indexes))
 
             # Selecting electrodes for structure
-            print("Picking electrodes for {} #{}".format(structure, structure_indexes))
-            electrodes = np.array(electrodes)[structure_indexes]
+            print("Picking electrodes for {}".format(structure))
+
+            
+            electrodes = np.array(electrodes)[channels_indexes]
             n_channels = len(electrodes)        
             print("# electrodes: {}".format(n_channels))
+            print("Electrodes indexes: {}".format(channels_indexes))
             
             # Loads and low-passes all channels of this mice
             iteration = 0
-            print("Loading channels...")
+            print("\nLoading channels...")
             for electrode in electrodes:
-                channel = ps.loadContinuous(electrode)
+                channel = loadRaw.loadContinuous(electrode)
 
                 # Low-pass filter
                 print('Low-pass filtering (order = {}) at {} Hz...'.format(filter_order, highcut))
                 b, a    = butter_bandpass(highcut=highcut, fs=fs, order=filter_order)            
-                data = channel['data'] #[start_OF - points_before : stop_OF]
-                data = signal.filtfilt(b=b, a=a, x=data - np.mean(data),
-                                       axis=-1, padtype='odd', padlen=None, method='pad', irlen=None)
+                channel = channel['data'] #[start_OF - points_before : stop_OF]
+                channel_mean = np.mean(channel)
+                channel_sd = np.std(channel)                
+
+                if detrend:
+                    print("Substracting channel's mean...")
+                    channel = channel - channel_mean
+                    
+                channel = signal.filtfilt(b=b, a=a, x=channel)
 
                 if iteration == 0:
-                    data_matrix = np.empty((n_channels, len(data)))
+                    channels_matrix = np.empty((n_channels, len(channel)))
+                    mean_vector = np.empty((n_channels, 1))
+                    sd_vector = np.empty((n_channels, 1))
 
-                data_matrix[iteration, :] = data        
+                channels_matrix[iteration, :] = channel
+                mean_vector[iteration] = channel_mean
+                sd_vector[iteration] = channel_sd
+
 
                 iteration += 1
+
+            print("\nCalculating standard deviations...")
+            corrected_sd_vector = np.empty((n_channels, 1))    
+            for i in range(n_channels):
+                corrected_sd_vector[i] = np.std(np.delete(channels_matrix, i, axis=0)) 
+
+            channels_statistics = dict(mean=mean_vector, sd=sd_vector, sd_i=corrected_sd_vector)
+
+            print("Calculating rejections...")
+            rejection = np.concatenate((np.where(sd_vector < -1.5 * corrected_sd_vector)[0], np.where(sd_vector > 1.5 * corrected_sd_vector)[0]))
+
+                
+            #sd = np.std(channels_matrix)
+            print("\nChannels mean:\n{}".format(mean_vector))
+            print("\nVector of s.d.:\n{}".format(sd_vector))            
+            print("\nVector of s.d.(j != i):\n{}".format(corrected_sd_vector))
+            print("\nChannels with sd > 1.5 x s.d(j != i):\n{}".format(rejection))
+            #print("\nAll channels sd:\n{}".format(np.std(channels_matrix)))
+            #rejection = np.where(mean_vector < -2 * sd)
+
+            # print("Rejection: {}".format(rejection))
+            # print("S.d.: {}".format(sd))
 
                 
             #print('\nCollecting all channels by structure...')    
             if substract == 'median':
-                print("Computing channels' median for {}...".format(structure))
-                substractor = np.median(data_matrix)
+                print("\nComputing channels' median for {}...".format(structure))
+                substractor = np.median(channels_matrix)
 
             if substract == 'mean':
-                print("Computing channels' median for {}...".format(structure))
-                substractor = np.mean(data_matrix)
+                print("\nComputing channels' median for {}...".format(structure))
+                substractor = np.mean(channels_matrix)
 
+            
             print("Substracting channels' {}...".format(substract))
-            print("Processing {} channels...".format(structure))
-            print("Channels numbers: {}".format(channels_indexes[structure]))
-            data_matrix = data_matrix - substractor
+            #print("Channels numbers: {}".format(channels_indexes[structure]))
+            channels_matrix = channels_matrix - substractor
+
 
             if save_data:
                 print("Saving...")
-                np.save('DATA/MICE/' + ID + '/npys/{}-{}'.format(structure, substract), data_matrix)
+                pickle.dump(channels_statistics, open('DATA/continuous/{}_channels.statistics'.format(ID), 'wb'), protocol=2)
+                np.save('DATA/continuous/{}_{}-{}'.format(ID, structure, substract), channels_matrix)
                 print('{} saved !!!'.format(structure))
 
 
-            del [iteration, channel, data, data_matrix]  
+            del [channel, channels_matrix]  
             print('Done!')
 
 
         # ## Loading triggers
         if load_triggers:
-            print("Loading triggers file...")
-            triggers_channel = ps.loadContinuous('DATA/MICE/' + ID + '/continuous/AUX/100_ADC1.continuous')
+            print("\nLoading triggers file...")
+            triggers_channel = loadRaw.loadContinuous('RAW/MICE/' + ID + '/continuous/AUX/100_ADC1.continuous')
 
             if save_data:
                 print("Saving triggers file...")
-                np.save('DATA/MICE/' + ID + '/npys/triggers', triggers_channel)
+                np.save("DATA/continuous/{}_triggers".format(ID), triggers_channel)
 
 
-        print("Mouse {} processed in {} min".format(ID, time.time() - clock))
+        print("\nMouse {} processed in {} min".format(ID, (time.time() - clock) / 60))
 
 
     # ## Print function end time
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
-    print("Process finished at {}".format(current_time))
+    print("\nProcess finished at {}".format(current_time))
 
