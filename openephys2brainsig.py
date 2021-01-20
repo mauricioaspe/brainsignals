@@ -9,6 +9,18 @@ OUTPUT:
     - 'DATA/continuous/{}_{}-{}'.format(ID, structure, substract), channels_matrix)
     - 'DATA/continuous/{}_triggers'
 
+
+    # [PASTED FROM MAIN FUNCTION BELOW]
+    # The loop
+    # - Load each of the 32 .continuous Openephys files
+    # - Subtract the mean
+    # - Low-pass it at 300 Hz
+    # - Subtract the median by structure
+    # - Save it as '/home/maspe/filer/SERT/SERTXXXX/npys/mPFC', for instance.
+    #
+    # [TODO] Add downsampling option
+
+
 '''
 
 
@@ -21,185 +33,147 @@ import loadEphys as loadRaw
 
 from scipy import signal
 from datetime import datetime
-#from matplotlib import pyplot as plt
-import pandas as pd
+from matplotlib import pyplot as plt
 import time
 import pickle
 
 sys.path.insert(1, "/home/maspe/filer/projects/brainsignals/modules/")
 os.chdir('/home/maspe/filer/projects/brainsignals/')
 
+### Parameters
+fs = 30000.0
+final_fs = 1000.0
+dt = 1 / final_fs
+
 
 # ## Filter
 # Butterpass at 300 Hz
-highcut = 300.0
-fs = 30000.0
-def butter_bandpass(highcut=highcut, fs=fs, order=5):
+def butter_bandpass(highcut=200.0, fs=30000.0, order=5):
     nyq  = 0.5 * fs
     high = highcut / nyq
     b, a = signal.butter(order, high)
     return b, a
 
 
-# ## Get channels indexes
-def getChannIndexes(ID):
-    print("Collecting channels for mouse {}...".format(ID))
-    # Read the list of channels
-    df = pd.read_csv('RAW/MICE/' + ID + '/csv/canales.csv', header=None)
-    channels_locations = df[0].values.tolist()
-
-    # Collect the indexes for each structure
-    mPFC = [i for i,x in enumerate(channels_locations) if x == 'mPFC_left']
-    NAC = [i for i,x in enumerate(channels_locations) if x == 'NAC_left']
-    BLA = [i for i,x in enumerate(channels_locations) if x == 'BLA_left']
-    vHip = [i for i,x in enumerate(channels_locations) if x == 'vHipp_left']
-    all_channels = [i for i,x in enumerate(channels_locations) if x in ['mPFC_left', 'NAC_left', 'BLA_left', 'vHipp_left']]
+def channels_sanity(channels_matrix):
+    mean_vector = np.mean(channels_matrix, axis=0)
+    sd_vector = np.std(channels_matrix, axis=0)
     
-    channels_indexes = {'channels_locations': channels_locations, 'mPFC': mPFC, 'NAC': NAC, 'BLA': BLA, 'vHip': vHip, 'all': all_channels} 
-    print("Channels indexes collected!")
+    n_channels = channels_matrix.shape[0]
+    ### Standard deviation of all j != i
+    print("\nCalculating standard deviations...")
+    corrected_sd = np.empty((n_channels, 1))    
+    for i in range(n_channels):
+        corrected_sd[i] = np.std(np.delete(channels_matrix, i, axis=0)) 
 
-    return channels_indexes
+    ### Calculating rejections according to criteria
+    print("Calculating rejections...")
+    rejection = np.concatenate((np.where(sd_vector < -1.5 * corrected_sd)[0], np.where(sd_vector > 1.5 * corrected_sd)[0]))
+    statistics = dict(mean=mean_vector, sd=sd_vector, sd_i=corrected_sd, rejection=rejection)
+
+    if False:
+        print("\nChannels mean:\n{}".format(mean_vector))
+        print("\nVector of s.d.:\n{}".format(sd_vector))            
+        print("\nVector of s.d.(j != i):\n{}".format(corrected_sd))
+        print("\nChannels with sd > 1.5 x s.d(j != i):\n{}".format(rejection))
+
+    return statistics
+
+
+def sanity_plot(ID, channels_matrix):
+    ### Plotting channels
+    plt.plot(channels_matrix[0, :])
+    plt.savefig('DATA/continuous/{}_chan1.png'.format(ID), dpi=150)
+    plt.close()
 
 
 # ############################
-# ## Main loop
-def raw_to_npy(IDs=['SERT1597'], structures=['mPFC'], only=[], filter_order=9, detrend=True, substract='median', downsampling=False, load_triggers=False, load_accelerometers=False, save_data=True):
-    
-    # The loop
-    # - Load each of the 32 .continuous Openephys files
-    # - Subtract the mean
-    # - Low-pass it at 300 Hz
-    # - Subtract the median by structure
-    # - Save it as '/home/maspe/filer/SERT/SERTXXXX/npys/mPFC', for instance.
-    #
-    # [TODO] Add downsampling option
+# ## Main function
+def raw_to_npy(IDs=['SERT1597'], only=[], highcut=200, filter_order=9, detrend=True, substract='median', downsampling=True, sanity=False, load_triggers=True, load_accelerometers=False, save_data=False):
 
+    now = datetime.now()
+    start_time = now.strftime("%H:%M:%S")
 
-    if (substract == 'median_all') & (structures != 'all'):
-        print("\n[WARNING] You can't substract=median_all when not selecting structures=all!")
-        print("-> substract=median_all changed to substract=median_structure !!\n")
-        substract = 'median_structure'
-        input("Press ENTER to continue...")
-
-        
-    # ## Main loop    
+    ### Main loop    
     for ID in IDs:
+        print("Processing mouse {}".format(ID))
         clock = time.time()
         path_to_continuous = 'RAW/MICE/' + ID + '/continuous/*.continuous'
+
         electrodes = sorted(glob.glob(path_to_continuous))
-
-
+        n_channels = len(electrodes)
+        
         if not detrend:
             print("[Warning] Detrending set to false!")
-
-        # Get channels and structures indexes
-        #channels_indexes = 
-        this_structures = list()
-        this_structures.append(structures)
-        print(this_structures)
-
-                
-        for structure in this_structures:
-            if structures == 'all':
-                channels_indexes = getChannIndexes(ID)['all']
-            else:
-                channels_indexes = getChannIndexes(ID)[structure]
-
-            if len(only):
-                channels_indexes = np.array(channels_indexes)[only] - 1
-                
-            #print("Structure indexes: {}".format(channels_indexes))
-
-            # Selecting electrodes for structure
-            print("Picking electrodes for {}".format(structure))
-
+        
+        if len(only):
+            print("[Warning] Loading only electrodes {} !!".format(only))
+            electrodes = [electrodes[i-1] for i in only]
+                            
+        ### ELECTRODES
+        # Loads and low-passes all channels of this mice
+        print("Loading channels...")        
+        iteration = 0
+        for electrode in electrodes:
+            channel = loadRaw.loadContinuous(electrode)
+            sample_rate = channel['header']['sampleRate']
             
-            electrodes = np.array(electrodes)[channels_indexes]
-            n_channels = len(electrodes)        
-            print("# electrodes: {}".format(n_channels))
-            print("Electrodes indexes: {}".format(channels_indexes))
+            ### Low-pass filter
+            print('Low-pass filtering (order = {}) at {} Hz...'.format(filter_order, highcut))
+            b, a = butter_bandpass(highcut=highcut, fs=sample_rate, order=filter_order)            
+            channel = signal.filtfilt(b=b, a=a, x=channel['data'])
+
+            ### Downsampling
+            if downsampling:
+                print('Downsampling to 1 KHz...')
+                ds_factor = sample_rate / final_fs
+                time_points = int(channel.shape[0] / ds_factor)
+                channel = signal.resample(x=channel, num=time_points)
+
+            ### Collecting preprocessed channel in numpy array 
+            if iteration == 0:
+                channels_matrix = np.empty((n_channels, len(channel)))
+
+            channels_matrix[iteration, :] = channel
+
+            iteration += 1
             
-            # Loads and low-passes all channels of this mice
-            iteration = 0
-            print("\nLoading channels...")
-            for electrode in electrodes:
-                channel = loadRaw.loadContinuous(electrode)
+        ### Electrodes ending
+        print("All channels loaded !!")
 
-                # Low-pass filter
-                print('Low-pass filtering (order = {}) at {} Hz...'.format(filter_order, highcut))
-                b, a    = butter_bandpass(highcut=highcut, fs=fs, order=filter_order)            
-                channel = channel['data'] #[start_OF - points_before : stop_OF]
-                channel_mean = np.mean(channel)
-                channel_sd = np.std(channel)                
+        ### Creating sanity statistics
+        statistics = channels_sanity(channels_matrix)
 
-                if detrend:
-                    print("Substracting channel's mean...")
-                    channel = channel - channel_mean
-                    
-                channel = signal.filtfilt(b=b, a=a, x=channel)
-
-                if iteration == 0:
-                    channels_matrix = np.empty((n_channels, len(channel)))
-                    mean_vector = np.empty((n_channels, 1))
-                    sd_vector = np.empty((n_channels, 1))
-
-                channels_matrix[iteration, :] = channel
-                mean_vector[iteration] = channel_mean
-                sd_vector[iteration] = channel_sd
-
-
-                iteration += 1
-
-            print("\nCalculating standard deviations...")
-            corrected_sd_vector = np.empty((n_channels, 1))    
-            for i in range(n_channels):
-                corrected_sd_vector[i] = np.std(np.delete(channels_matrix, i, axis=0)) 
-
-            channels_statistics = dict(mean=mean_vector, sd=sd_vector, sd_i=corrected_sd_vector)
-
-            print("Calculating rejections...")
-            rejection = np.concatenate((np.where(sd_vector < -1.5 * corrected_sd_vector)[0], np.where(sd_vector > 1.5 * corrected_sd_vector)[0]))
-
-                
-            #sd = np.std(channels_matrix)
-            print("\nChannels mean:\n{}".format(mean_vector))
-            print("\nVector of s.d.:\n{}".format(sd_vector))            
-            print("\nVector of s.d.(j != i):\n{}".format(corrected_sd_vector))
-            print("\nChannels with sd > 1.5 x s.d(j != i):\n{}".format(rejection))
-            #print("\nAll channels sd:\n{}".format(np.std(channels_matrix)))
-            #rejection = np.where(mean_vector < -2 * sd)
-
-            # print("Rejection: {}".format(rejection))
-            # print("S.d.: {}".format(sd))
-
-                
-            #print('\nCollecting all channels by structure...')    
-            if substract == 'median':
-                print("\nComputing channels' median for {}...".format(structure))
-                substractor = np.median(channels_matrix)
-
-            if substract == 'mean':
-                print("\nComputing channels' median for {}...".format(structure))
-                substractor = np.mean(channels_matrix)
-
+        if sanity:    
+            sanity_plot(ID, channels_matrix)
             
-            print("Substracting channels' {}...".format(substract))
-            #print("Channels numbers: {}".format(channels_indexes[structure]))
-            channels_matrix = channels_matrix - substractor
+        ### Detrending
+        if detrend:
+            print("Substracting channel's mean...")
+            channel = channel - statistics['mean']            
+    
+        ### Substracting mean or median of all channels (INCLUIR A SI MISMO?)
+        if substract == 'median':
+            print("\nComputing channels' median...")
+            substractor = np.median(channels_matrix, axis=0)
 
+        if substract == 'mean':
+            print("\nComputing channels' median...")
+            substractor = np.mean(channels_matrix, axis=0)
 
-            if save_data:
-                print("Saving...")
-                pickle.dump(channels_statistics, open('DATA/continuous/{}_channels.statistics'.format(ID), 'wb'), protocol=2)
-                np.save('DATA/continuous/{}_{}-{}'.format(ID, structure, substract), channels_matrix)
-                print('{} saved !!!'.format(structure))
+        print("Substracting channels' {}...".format(substract))
+        channels_matrix = channels_matrix - substractor
 
+        ### Saving channel's statistics
+        if save_data:
+            print("Saving...")
+            #pickle.dump(channels_statistics, open('DATA/continuous/{}_channels.statistics'.format(ID), 'wb'), protocol=2)
+            np.save('DATA/continuous/{}_{}'.format(ID, substract), channels_matrix)
+            print('{} saved !!!'.format(ID))
 
-            del [channel, channels_matrix]  
-            print('Done!')
-
-
-        # ## Loading triggers
+        del [channel, channels_matrix]  
+        
+        ### Loading triggers
         if load_triggers:
             print("\nLoading triggers file...")
             triggers_channel = loadRaw.loadContinuous('RAW/MICE/' + ID + '/continuous/AUX/100_ADC1.continuous')
@@ -208,12 +182,12 @@ def raw_to_npy(IDs=['SERT1597'], structures=['mPFC'], only=[], filter_order=9, d
                 print("Saving triggers file...")
                 np.save("DATA/continuous/{}_triggers".format(ID), triggers_channel)
 
+        print("\nMouse {} processed in {:.2f} min\n\n".format(ID, (time.time() - clock) / 60))
 
-        print("\nMouse {} processed in {} min".format(ID, (time.time() - clock) / 60))
-
-
-    # ## Print function end time
+        
+    ### Print function end time
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
-    print("\nProcess finished at {}".format(current_time))
+    print("\nProcess started at {} and finished at {}".format(start_time, current_time))
 
+    print("Done!")

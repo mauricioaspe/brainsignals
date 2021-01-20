@@ -4,28 +4,11 @@
 import openephys2brainsig as o2b
 
 
-#IDs = input("IDs = ['ID1597', 'ID1659'] (y/n)? ")
-IDs = ['ID1597']#, 'ID1659']
-
-#option = input("Substract = median (y/n)? ")
-substract = 'median'
+IDs = ['ID1597', 'ID1659', 'ID1678', 'ID1908', 'ID1984', 'ID1985', 'ID2014', 'ID1668', 'ID1665', 'ID2018', 'ID2024', 'ID2013']
 
 
-structure = ['mPFC']
-print(structure)
-option = input("Structure: mPFC (y/n)? ").lower()
-if option == 'n':
-    structure = input("Select structure: ")
-    print(structure)
-        
-
-save_data = False
-option = input("Save data = False (y/n)? ").lower()
-if option == "y":
-    save_data = True
-
-
-o2b.raw_to_npy(IDs=IDs, structures=structure, only=[], filter_order=9, detrend=False, substract=substract, downsampling=False, load_triggers=True, load_accelerometers=False, save_data=save_data)
+only = []
+o2b.raw_to_npy(IDs=IDs, only=only, highcut=200, filter_order=9, detrend=True, substract='median', downsampling=True, sanity=True, load_triggers=True, load_accelerometers=False, save_data=True)
 
 
 
