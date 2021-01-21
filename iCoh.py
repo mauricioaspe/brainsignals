@@ -5,21 +5,21 @@
 import os
 import sys
 
+### Configuring directories
+#os.chdir('/home/maspe/filer/projects/brainsignals')
+sys.path.append('/home/maspe/filer/projects/brainsignals/modules/')
+
 import pickle
 import time
 import numpy as np
 from scipy import signal
 import matplotlib.pyplot as plt
+import connectivity_measures as cm
 
 abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 os.chdir(dname)
-print("Directory changed to\n{}".format(dname))
-
-sys.path.append('modules/')
-
-import connectivity_measures as cm
-
+print(os.getwd)
 
 ### List of animals to process
 IDs = ['ID1597', 'ID1659']
@@ -46,7 +46,7 @@ for band in filter_parameters.keys():
     N = filter_parameters[band]['N']
     butterworths[band] = butter_bandpass(lowcut, highcut, fs, order=N)
 
-### Main loop
+
 iCohs = {key: {} for key in filter_parameters.keys()}
 for ID in IDs: 
     epochs_dir = 'DATA/epochs/'
@@ -59,7 +59,7 @@ for ID in IDs:
     #filtered_bands = {key: {} for key in filter_parameters.keys()}
     #iterator = 0
     
-    # Filters the 32 channels matrix along the time_points axis 
+    # Filters the 32 channels x 180,000 time_points x n epochs matrix along the time_points axis 
     print('Filtering...')    
     for band in iCohs.keys():
         filtered = signal.filtfilt(b=butterworths[band][0], a=butterworths[band][1],
@@ -83,13 +83,13 @@ for ID in IDs:
             icoh_post  = np.dstack((icoh_pre, cm.icoh(filtered[:,int(time_points / 2):,epoch], average = False)))
 
     print('iCoh calculated in {:.2f} min'.format(time.time() - clock))
-    print("ICoh shape: {}".format(icoh_pre.shape))
+    print("ICoh shape (channels, channels, epochs): {}".format(icoh_pre.shape))
 
     iCohs[band]['pre'] = icoh_pre
     iCohs[band]['post'] = icoh_post
 
-
 #pickle.dump(iCohs, open(npys_dir + mouse + '_BLA_vHip.icoh', 'wb'), protocol=2)
+
 print('Done!')  
 
 
