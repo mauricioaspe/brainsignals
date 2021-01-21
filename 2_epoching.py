@@ -45,7 +45,7 @@ n_baselines = 25
 substracted = 'median'
 extract_epochs = True
 plotting_epochs = False
-save_data = False
+save_data = True
 extract_baselines = False
 
 
@@ -82,7 +82,6 @@ def plotting():
         plt.close()
     
 
-epochs = {}
 iterator = 1
 for ID in IDs:
     clock = time.time()
@@ -114,7 +113,7 @@ for ID in IDs:
     print("Recording length: {:.2f} min".format(data_points / fs / 60))
 
     if extract_epochs:
-        print('Collecting epochs...')
+        print("\nCollecting epochs...")
         data_epochs = np.zeros((n_channels, window_pre + window_post, n_epochs))
         print("Empty data epoch shape: {}".format(data_epochs.shape))
 
@@ -130,22 +129,21 @@ for ID in IDs:
                     for baseline in range(n_baselines):
                         data_baselines[channel, :, baseline] = data[channel, baselines[baseline] : baselines[baseline] + baseline_length]
 
-        epochs[ID] = data_epochs
+        epochs = data_epochs
         if extract_baselines:
-            structures['baselines'] = data_baselines
+            baselines = data_baselines
 
     if plotting_epochs:
         plotting()
 
     iterator += 1
 
-    # if save_data:
-    #     print('Saving epoched dictionary...')
-    #     pickle.dump(structures, open('DATA/epochs/' + ID + '.epochs', 'wb'), protocol=2)              
+    if save_data:
+        print("Saving epoched dictionary...")
+        np.save('DATA/epochs/' + ID + '_epochs', epochs)              
 
-    # print('Epochs extracted in {:.2f} min.\n'.format((time.time() - clock) / 60))
+    print('Epochs extracted in {:.2f} s.\n'.format(time.time() - clock))
 
-    print(data_epochs)
 
 
 print('Done!')

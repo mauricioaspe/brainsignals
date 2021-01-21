@@ -3,31 +3,28 @@
 
 '''
 
-
 '''
-
 
 ### Importing required modules
 import os
 import sys
+
+### Configuring directories
+os.chdir('/home/maspe/filer/projects/brainsignals')
+sys.path.append('/home/maspe/filer/projects/brainsignals/modules/')
+
+print("Working path changed to {}".format(os.getcwd()))
+
 import time
 import pickle
-
 import numpy as np
 import wavelets as wl
-
 from scipy import signal
 from matplotlib import pyplot as plt
 
 
-### Configuring directories
-sys.path.append('/home/maspe/filer/projects/brainsignals/modules')
-os.chdir('/home/maspe/filer/projects/brainsignals')
-print("Working path changed to {}".format(os.getcwd()))
-
-
 ### Morlet transform
-def transform(mice_list=[''], structures_list=[''], n_freq=80, substract_baseline=False, epoch_length=6, final_fs=1000.0, save_data=False):
+def transform(IDs=[''], n_freq=80, substract_baseline=False, epoch_length=4, final_fs=1000.0, save_data=False):
     ### Downsampling and band-pass parameters
     ### Parameters
     # Downsampling parameters: final resolution = 1000 Hz
@@ -47,28 +44,24 @@ def transform(mice_list=[''], structures_list=[''], n_freq=80, substract_baselin
         this_type = 'no-baselines'
         conditions = ['epochs']
 
-    IDs = {key: {} for key in mice_list}
-    structures = {key: {} for key in structures_list}
 
     iteration = 1
     data_dict = {}
     master_clock = time.time()
-
-
-    for mouse in IDs.keys():
+    for ID in IDs:
         clock = time.time()
-        print('Loading mouse {} (#{})...'.format(mouse, iteration))
-        npys_dir  = '/home/maspe/filer/projects/brainsignals/DATA/MICE/' + mouse + '/npys/'
+        print('Loading mouse {} (#{})...'.format(ID, iteration))
+        mydir  = '/home/maspe/filer/projects/brainsignals/'
 
-        with open(npys_dir + mouse + '.info', 'rb') as f:
-            info = pickle.load(f, encoding='latin1')
+        # with open(npys_dir + mouse + '.info', 'rb') as f:
+        #     info = pickle.load(f, encoding='latin1')
 
         ### Loading data    
-        all_data = pickle.load(open(npys_dir + mouse + '.epochs', 'rb'), encoding="latin1")
+        all_data = np.load(mydir + 'DATA/epochs/' + ID + '_epochs.npy')
 
 #        for structure in structures.keys():
-        print('\nLoading {}...'.format(structure))
-        print("Keys: {}".format(all_data[structure].keys()))
+        print('\nLoading {}...'.format(ID))
+
         for condition in conditions: # Iterates in baselines and epochs
             if condition == 'epochs':
                 print('Processing epochs...')
@@ -79,13 +72,8 @@ def transform(mice_list=[''], structures_list=[''], n_freq=80, substract_baselin
                     time_points = time_windows.shape[0] // 2
 
             ### Loading the data
-            data = all_data[structure][condition]
+            data = all_data
             print("Datashape pre resampling: {}".format(data.shape))
-
-            ### Downsampling
-            print('Downsampling to 1 KHz...')
-            data = signal.resample(x=data, num=time_points, axis=1)
-            print("Datashape resampled: {}".format(data.shape))
 
             ### Morlet transform
             clock = time.time()
@@ -96,7 +84,6 @@ def transform(mice_list=[''], structures_list=[''], n_freq=80, substract_baselin
             for epoch in range(n_epochs): #range(2)
                 for channel in range(n_channels):
                     morlet_matrix[:, :, channel, epoch] = wl.Morlet(data[channel, :, epoch], scales=scales).getnormpower()            
-
 
             print("Morlet matrix: {}".format(morlet_matrix.shape))
 
@@ -117,16 +104,15 @@ def transform(mice_list=[''], structures_list=[''], n_freq=80, substract_baselin
             baseline_sd = np.std(morlets_baselines, axis=(1,3))
             morlets_epochs = (morlets_epochs - baseline_mean[:, None, :, None]) / baseline_sd[:, None, :, None]
 
-        structures[structure] = np.mean(morlets_epochs, axis=3)
-        print("Final shape: {}".format(structures[structure].shape))
-
+        structures = np.mean(morlets_epochs, axis=3)
+        print("Final shape: {}".format(structures.shape))
 
         
         iteration += 1
 
         if save_data:
-            print('Saving dictionary...')    
-            pickle.dump(structures, open(npys_dir + 'morlets-{}.epochs'.format(this_type), 'wb'), protocol=2)
+            print('Saving morlets...')    
+            np.save(mydir + 'results/spectrograms/' + ID + '_morlets')
 
         print('Mouse processed in {:.2f} min.\n'.format((time.time() - clock) / 60))
 
@@ -146,13 +132,13 @@ def groupGenotypes(IDs, IDs_WT, IDs_KO, structures=[], this_type='baselines'):
     iterator_KO = 0
 
     ### Group by genotype and structure
-    for mouse in IDs:
+    for ID in IDs:
         print('Loading {}...'.format(mouse))
 
         ### Loading data
-        npys_dir = '/home/maspe/filer/projects/brainsignals/DATA/MICE/' + mouse + '/npys/'
+        epochs_dir = '/home/maspe/filer/projects/brainsignals/DATA/epochs/'
 
-        data = pickle.load(open(npys_dir + 'morlets-{}.epochs'.format(this_type), 'rb'))
+        data = np.load(epochs_dir + ID + '_epochs.npy')
 
         #print("Data keys: {}".format(data.keys()))
         #print("mPFC shape: {}".format(data['mPFC'].shape))
