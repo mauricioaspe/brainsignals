@@ -1,43 +1,33 @@
 # brainsignals
 Analysis of LFPs spectral and spiking activity, spiking/LFPs coupling, and other neurophysiological data.
 
-
-## Usage
+## Coherence analysis
+#### Usage
 ```
-#!/usr/bin/env python3
-# coding: utf-8
-
-import spectralAnalysis as spectrograms
+python3 4_iCoh.py
 ```
 
+Filters for different frequency bands in `filter_parameters = {'theta': {'N': 4, 'lowcut': 3.5,  'highcut': 7.5}}` and obtains imaginary part of coherence (32 channels x 32 channels x n events matrix)
 
-Give a list of IDs and structures
+
+## Spectrograms
+#### Usage
 ```
-IDs = ['SERT1597', 'SERT1659', 'SERT1678', 'SERT1908', 'SERT1984', 'SERT1985', 'SERT2014', 'SERT1665', 'SERT1668', 'SERT2013', 'SERT2018', 'SERT2024'] 
-IDs_WT = ['SERT1597', 'SERT1659', 'SERT1678', 'SERT1908', 'SERT1984', 'SERT1985', 'SERT2014'] 
-IDs_KO = ['SERT1665', 'SERT1668', 'SERT2013', 'SERT2018', 'SERT2024'] 
-
-structures = ['mPFC', 'NAC', 'BLA', 'vHip']
+python3 3_spectrograms.py
 ```
-
-Parameters:
+Get a list of IDs and obtains the spectrograms
 ```
-this_type = 'no-baselines'
-save_figs = True
-
-# Setting colormap range
-mycolormap = {'mPFC': (-1.5,1.5), 'NAC': (-1.5,1.5), 'BLA': (-1.5,1.5), 'vHip': (-1.5,1.5)}
-color_lim = False
-this_type = 'baselines'
+IDs = ['ID1597', 'ID1659'] #, 'ID1678', 'ID1908', 'ID1984', 'ID1985', 'ID2014', 'ID1668', 'ID1665', 'ID2018', 'ID2024', 'ID2013']
+spectra.transform(IDs, n_freq=80, substract_baseline=False, epoch_length=4, final_fs=1000.0, save_data=False)
 ```
 
-Group mice by genotypes:
+## Epoching
+##### Usage
 ```
-grandAverages = spectrograms.groupGenotypes(IDs=IDs, IDs_WT=IDs_WT, IDs_KO=IDs_KO, structures=structures, this_type=this_type)
+python3 2_epoching.py
 ```
-
-Plot spectrograms:
+Get a list of IDs and make the epochs according to 
 ```
-spectrograms.plotGenotypes(grandAverages, mycolormap, genotype='WT', this_type=this_type, color_lim=True, save_figs=True)
-spectrograms.plotDifferences(grandAverages, mycolormap, structures=structures, this_type='baselines', color_lim=False, save_figs=True)
+seconds_pre = 2
+seconds_post = 2
 ```
