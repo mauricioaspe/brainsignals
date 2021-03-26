@@ -1,3 +1,6 @@
 [submodule "modules/micetracker"]
 	path = modules/micetracker
 	url = https://github.com/CyberPunkLabs/micetracker.git
+[submodule "modules/biotracker"]
+	path = modules/biotracker
+	url = https://github.com/CyberPunkLabs/biotracker.git
