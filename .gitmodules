@@ -3,4 +3,8 @@
 	url = https://github.com/CyberPunkLabs/micetracker.git
 [submodule "modules/biotracker"]
 	path = modules/biotracker
+<<<<<<< HEAD
 	url = https://github.com/CyberPunkLabs/biotracker.git
+=======
+	url = https://github.com/CyberPunkLabs/biotracker
+>>>>>>> 2f3d115fc3bfbcae6d2f53b684be2590f2ce0e95
